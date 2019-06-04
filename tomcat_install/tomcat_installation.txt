@@ -1,0 +1,82 @@
+How to install apache tomcat on Linux Redhat 8 step by step instructions
+We will install a Tomcat server not from an rpm package, but a zip file that we will download from the official site. Therefore the user that will be running the server, filesystem paths and rights must be set by hand. While installing from rpm is a much more convenient way, there may be situations where it is not an option. 
+
+The most trivial example would be that the rpm package is not available, another could be that the application that will run in the Tomcat container requires an exact version of tomcat, and by leaving the package manager out of the installation it is ensured that system updates will leave the Tomcat server untouched. Of course this may not be optimal from the security perspective.
+
+For this installation to work you need to have Java 1.8 installed on the target system.
+
+First, we'll download and extract the zip package. By browsing the download site of Tomcat 8, we can copy the link we need, and use wget on the target system. 
+
+We'll use /opt as the base path of the installation, as it is a common place for software installed by hand. Let's switch to this directory:
+# cd /opt
+And download the package directly to this path:
+# wget https://www-us.apache.org/dist/tomcat/tomcat-8/v8.5.37/bin/apache-tomcat-8.5.37.zip
+--2019-01-02 18:06:00--  https://www-us.apache.org/dist/tomcat/tomcat-8/v8.5.37/bin/apache-tomcat-8.5.37.zip
+Resolving www-us.apache.org (www-us.apache.org)... 40.79.78.1
+Connecting to www-us.apache.org (www-us.apache.org)|40.79.78.1|:443... connected.
+HTTP request sent, awaiting response... 200 OK
+Length: 10246390 (9.8M) [application/zip]
+Saving to: 'apache-tomcat-8.5.37.zip'
+
+apache-tomcat-8.5.37.zip                           100%[================================================================================================================>]   9.77M   280KB/s    in 23s     
+
+2019-01-02 18:06:24 (444 KB/s) - 'apache-tomcat-8.5.37.zip' saved [10246390/10246390]
+The mirror may vary by location, for optimal performance, use the mirror closest to your location.Next we extract the package with unzip in-place:
+# unzip apache-tomcat-8.5.37.zip
+We create a symbolic link /opt/tomcat pointing to /opt/apache-tomcat-8.5.37:
+# ln -s /opt/apache-tomcat-8.5.37 /opt/tomcat
+This way installing yet another version, and switching to it is a matter of changing where the symlink is pointing to.
+We delete the original /opt/tomcat/logs directory, and replace it with a symlink pointing to /var/log/tomcat:
+# mkdir /var/log/tomcat
+# rmdir /opt/tomcat/logs
+# ln -s /var/log/tomcat /opt/tomcat/logs
+The reason behind this is to store all logs under /var/log where the storage is handled with system load, and therefore logfile sizes in mind. It is a good practice to store data of the same type in one place, and /var/log is already the place of the system logfiles.
+We create the user that will run the server, and set it as the owner of the required directories:
+# useradd tomcat
+# chown -R tomcat:tomcat /opt/apache-tomcat-8.5.37
+# chown -R tomcat:tomcat /var/log/tomcat
+We add execute rights to the scripts located in the bin directory:
+# chmod +x /opt/tomcat/bin/*.sh
+We create a basic service file /etc/systemd/system/tomcat.service for systemd with our favorite text editor, like vi or nano with the following content:
+[Unit]
+Description=Tomcat
+After=syslog.target network.target
+
+[Service]
+Type=forking
+
+User=tomcat
+Group=tomcat
+
+ExecStart=/opt/tomcat/bin/catalina.sh start
+ExecStop=/opt/tomcat/bin/catalina.sh stop
+
+[Install]
+WantedBy=multi-user.target
+We reload the systemd configuration, so systemd will notice the new service file:
+# systemctl daemon-reload
+We will access Tomcat on port 8080. We open the port on the firewall:
+# firewall-cmd --zone=public --add-port=8080/tcp --permanent
+And reload the firewall:
+# firewall-cmd --reload
+We ask systemd about the new service:
+# systemctl status tomcat
+ tomcat.service - Tomcat
+   Loaded: loaded (/etc/systemd/system/tomcat.service; disabled; vendor preset: disabled)
+   Active: inactive (dead)
+As systemd now knows about the serice, we can start it:
+# systemctl start tomcatFinally, we verify our running server with systemd:
+# systemctl status tomcat
+ tomcat.service - Tomcat
+   Loaded: loaded (/etc/systemd/system/tomcat.service; disabled; vendor preset: disabled)
+   Active: active (running) since Wed 2019-01-02 18:40:00 CET; 4s ago
+  Process: 4854 ExecStop=/opt/tomcat/bin/catalina.sh stop (code=exited, status=0/SUCCESS)
+  Process: 5529 ExecStart=/opt/tomcat/bin/catalina.sh start (code=exited, status=0/SUCCESS)
+ Main PID: 5543 (java)
+    Tasks: 47 (limit: 12544)
+   Memory: 85.2M
+   CGroup: /system.slice/tomcat.service
+           ˪5543 /usr/bin/java -Djava.util.logging.config.file=/opt/tomcat/conf/logging.properties [...]
+If we open up a browser, and type http://<name-or-ip-address-of-the-server>:8080/examples/ to the address bar, we should see the official examples shipped with the package that are served from our successfully installed Tomcat server.
+If needed, we can set systemd to automatically start our server on boot:
+# systemctl enable tomcat
