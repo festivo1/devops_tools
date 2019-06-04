@@ -5,6 +5,6 @@ ubuntu:
 sudo apt-get install ansible -y
 
 redhat7:
-sudo rpm -Uvh https://d1.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+sudo rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 sudo yum -y install ansible
 
