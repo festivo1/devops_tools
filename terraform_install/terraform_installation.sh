@@ -23,6 +23,5 @@ function install_terraform{
 	 echo "=========================================="
  fi
 }
-sudo apt -get install unzip -y 
 install_terraform
 
